@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalkulator CPM & Diagram AON Terotomatisasi</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #333;
+        background-color: #f4f7f6;
+        padding: 15px;
+      }
+      .container {
+        max-width: 1300px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      }
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        flex: 1;
+        min-width: 140px;
+        padding: 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1px solid #ccc;
+        background: #fdfdfd;
+        color: #555;
+        cursor: pointer;
+        transition: background 0.2s;
+        text-align: center;
+      }
+      .tab.on {
+        background: #2c3e50;
+        color: #fff;
+        border-color: #2c3e50;
+      }
+      .info-summary {
+        background: #eef2f7;
+        border-radius: 4px;
+        padding: 15px;
+        font-size: 13px;
+        margin-bottom: 20px;
+        border-left: 6px solid #2c3e50;
+      }
+      .btn-download {
+        display: inline-block;
+        padding: 8px 16px;
+        background: #27ae60;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .btn-download:hover {
+        background: #219653;
+      }
+      .btn-secondary {
+        background: #2c3e50;
+      }
+      .btn-secondary:hover {
+        background: #1a252f;
+      }
+
+      .import-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #fdfdfd;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #fff;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 1000px;
+        font-size: 12px;
+      }
+      th {
+        background: #f2f2f2;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid #ccc;
+        color: #333;
+        font-weight: 700;
+      }
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+      }
+      tr.crit-row td {
+        background: #fff4f4;
+      }
+
+      .svg-wrap {
+        overflow: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #fff;
+        padding: 20px;
+        -webkit-overflow-scrolling: touch;
+        cursor: default;
+      }
+      svg {
+        display: block;
+        height: auto;
+        user-select: none;
+      }
+      .node-group {
+        cursor: grab;
+      }
+      .node-group:active {
+        cursor: grabbing;
+      }
+      .path-layer path {
+        pointer-events: none;
+      }
+
+      .legend-container {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-size: 11px;
+        margin-bottom: 15px;
+        padding: 12px;
+        background: #fcfcfc;
+        border: 1px solid #eee;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 2px;
+      }
+
+      .path-result {
+        background: #fff;
+        border: 1px solid #eee;
+        border-left: 6px solid #c0392b;
+        padding: 20px;
+        border-radius: 4px;
+      }
+      .node-tag {
+        display: inline-block;
+        margin: 4px;
+        padding: 4px 10px;
+        background: #fdf2f2;
+        color: #c0392b;
+        border: 1px solid #eababa;
+        font-weight: 700;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="tabs">
+        <button class="tab on" onclick="showTab('tabel')">
+          Tabel Perhitungan CPM
+        </button>
+        <button class="tab" onclick="showTab('diagram')">
+          Diagram AON (Berwarna)
+        </button>
+        <button class="tab" onclick="showTab('bw')">
+          Diagram AON (Hitam Putih)
+        </button>
+        <button class="tab" onclick="showTab('kritis')">
+          Analisis Jalur Kritis
+        </button>
+      </div>
+
+      <div class="import-section">
+        <div>
+          <strong>Import Data CSV:</strong>
+          <input
+            type="file"
+            id="csvFileInput"
+            accept=".csv"
+            style="margin-left: 10px"
+          />
+          <small style="color: #666; display: block; margin-top: 5px"
+            >*Gunakan file hasil unduhan template. Simpan dari Excel dengan
+            format CSV (titik koma akan otomatis terdeteksi).</small
+          >
+        </div>
+        <button class="btn-download btn-secondary" onclick="unduhTemplateCSV()">
+          Unduh Template CSV
+        </button>
+      </div>
+
+      <div class="info-summary" id="infobox"></div>
+
+      <div id="tab-tabel">
+        <button
+          class="btn-download"
+          style="margin-bottom: 15px"
+          onclick="unduhGambar('tabel-wrapper', 'Tabel_CPM_Proyek.png')"
+        >
+          Unduh Tabel (PNG)
+        </button>
+        <div
+          id="tabel-wrapper"
+          style="background: #fff; padding: 10px; border-radius: 4px"
+        >
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Deskripsi Aktivitas</th>
+                  <th>Durasi</th>
+                  <th>ES</th>
+                  <th>EF</th>
+                  <th>LS</th>
+                  <th>LF</th>
+                  <th>Slack</th>
+                  <th>Kritis</th>
+                </tr>
+              </thead>
+              <tbody id="restbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-diagram" style="display: none">
+        <div class="legend-container">
+          <div style="display: flex; gap: 15px; flex-wrap: wrap">
+            <div class="legend-item">
+              <span
+                class="swatch"
+                style="background: #e6f1fb; border: 1px solid #185fa5"
+              ></span>
+              Biru: ES | ID | EF
+            </div>
+            <div class="legend-item">
+              <span
+                class="swatch"
+                style="background: #f4f2ec; border: 1px solid #888"
+              ></span>
+              Abu: Slack | Nama Aktivitas
+            </div>
+            <div class="legend-item">
+              <span
+                class="swatch"
+                style="background: #eaf3de; border: 1px solid #3b6d11"
+              ></span>
+              Hijau: LS | Durasi | LF
+            </div>
+            <div class="legend-item">
+              <span
+                class="swatch"
+                style="background: #fcebeb; border: 1px solid #c0392b"
+              ></span>
+              Merah: Aktivitas Jalur Kritis
+            </div>
+            <div class="legend-item">
+              <strong
+                >💡 Tips: Klik dan tahan kotak untuk menggeser letak
+                diagram</strong
+              >
+            </div>
+          </div>
+          <button
+            class="btn-download"
+            style="margin-bottom: 0"
+            onclick="unduhGambar('diagram-konten', 'Diagram_AON_Berwarna.png')"
+          >
+            Unduh Diagram (PNG)
+          </button>
+        </div>
+        <div
+          id="diagram-konten"
+          style="background: #fff; padding: 10px; border-radius: 4px; margin: 0"
+        >
+          <div class="svg-wrap">
+            <svg id="diagram"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-bw" style="display: none">
+        <div class="legend-container">
+          <div style="display: flex; gap: 15px; flex-wrap: wrap">
+            <div class="legend-item">
+              <strong>Template Standar Manajemen Waktu Proyek</strong>
+            </div>
+            <div class="legend-item">
+              <strong
+                >💡 Tips: Klik dan tahan kotak untuk menggeser letak
+                diagram</strong
+              >
+            </div>
+          </div>
+          <button
+            class="btn-download"
+            style="margin-bottom: 0"
+            onclick="unduhGambar('bw-konten', 'Diagram_AON_HitamPutih.png')"
+          >
+            Unduh Hitam Putih (PNG)
+          </button>
+        </div>
+        <div
+          id="bw-konten"
+          style="background: #fff; padding: 10px; border-radius: 4px; margin: 0"
+        >
+          <div class="svg-wrap" style="background-color: #fafafa">
+            <svg id="diagram-bw"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-kritis" style="display: none">
+        <div class="path-result" id="critbox"></div>
+      </div>
+    </div>
+
+    <script>
+      const raw = [
+        { id: "1", name: "Tahap Persiapan Contoh", d: 2, pre: [] },
+        { id: "2", name: "Analisis Kebutuhan", d: 3, pre: ["1"] },
+        { id: "3.1", name: "Perancangan UI/UX", d: 5, pre: ["2"] },
+        { id: "3.2", name: "Perancangan Database", d: 4, pre: ["2"] },
+        { id: "4", name: "Pengembangan Sistem", d: 10, pre: ["3.1", "3.2"] },
+        { id: "5", name: "Testing dan Deployment", d: 3, pre: ["4"] },
+      ];
+
+      const ns = "http://www.w3.org/2000/svg";
+      let map, order, projEnd;
+      let posColored = {},
+        posBW = {};
+
+      function topoSort(rows) {
+        const inDeg = {},
+          adj = {};
+        rows.forEach((r) => {
+          inDeg[r.id] = 0;
+          adj[r.id] = [];
+        });
+        rows.forEach((r) =>
+          r.pre.forEach((p) => {
+            if (adj[p]) {
+              adj[p].push(r.id);
+              inDeg[r.id]++;
+            }
+          }),
+        );
+        const q = rows.filter((r) => inDeg[r.id] === 0).map((r) => r.id);
+        const out = [];
+        while (q.length) {
+          const v = q.shift();
+          out.push(v);
+          if (adj[v]) {
+            adj[v].forEach((w) => {
+              if (--inDeg[w] === 0) q.push(w);
+            });
+          }
+        }
+        return out;
+      }
+
+      function calc(rows) {
+        const localMap = {};
+        rows.forEach((r) => {
+          localMap[r.id] = { ...r, ES: 0, EF: 0, LS: 0, LF: 0, SL: 0 };
+        });
+        const localOrder = topoSort(rows);
+        localOrder.forEach((id) => {
+          const m = localMap[id];
+          const validPre = m.pre.filter((p) => localMap[p]);
+          m.ES =
+            validPre.length === 0
+              ? 0
+              : Math.max(...validPre.map((p) => localMap[p].EF));
+          m.EF = m.ES + m.d;
+        });
+        const localProjEnd =
+          localOrder.length > 0
+            ? Math.max(...localOrder.map((id) => localMap[id].EF))
+            : 0;
+        [...localOrder].reverse().forEach((id) => {
+          const m = localMap[id];
+          const succs = rows.filter((r) => r.pre.includes(id));
+          m.LF =
+            succs.length === 0
+              ? localProjEnd
+              : Math.min(...succs.map((s) => localMap[s.id].LS));
+          m.LS = m.LF - m.d;
+          m.SL = m.LS - m.ES;
+        });
+        return { map: localMap, order: localOrder, projEnd: localProjEnd };
+      }
+
+      function initData() {
+        const result = calc(raw);
+        map = result.map;
+        order = result.order;
+        projEnd = result.projEnd;
+      }
+
+      function buildTable() {
+        const tb = document.getElementById("restbody");
+        tb.innerHTML = "";
+        raw.forEach((r) => {
+          const m = map[r.id];
+          if (!m) return;
+          const crit = m.SL === 0;
+          const tr = document.createElement("tr");
+          if (crit) tr.classList.add("crit-row");
+          tr.innerHTML = `
+            <td><strong>${r.id}</strong></td><td>${r.name}</td><td>${r.d}</td>
+            <td>${m.ES}</td><td>${m.EF}</td><td>${m.LS}</td><td>${m.LF}</td>
+            <td style="color:${crit ? "#c0392b" : "#333"}; font-weight:700">${m.SL}</td>
+            <td>${crit ? "Ya" : "Tidak"}</td>`;
+          tb.appendChild(tr);
+        });
+      }
+
+      function layoutNodes(configNW, configNH) {
+        const cols = {};
+        order.forEach((id) => {
+          const r = raw.find((x) => x.id === id);
+          if (!r) return;
+          const preDepths = r.pre.map((p) => cols[p]?.col ?? 0);
+          cols[id] = { col: preDepths.length ? Math.max(...preDepths) + 1 : 0 };
+        });
+        const colGroups = {};
+        order.forEach((id) => {
+          const c = cols[id].col;
+          if (!colGroups[c]) colGroups[c] = [];
+          colGroups[c].push(id);
+        });
+        const pos = {};
+        const padX = 40,
+          padY = 40,
+          gX = 120,
+          gY = 55;
+        Object.keys(colGroups)
+          .sort((a, b) => a - b)
+          .forEach((c) => {
+            colGroups[c].forEach((id, i) => {
+              pos[id] = {
+                x: padX + c * (configNW + gX),
+                y: padY + i * (configNH + gY),
+              };
+            });
+          });
+        const colKeys = Object.keys(colGroups).map(Number);
+        const maxCol = colKeys.length > 0 ? Math.max(...colKeys) : 0;
+        const groupVals = Object.values(colGroups).map((g) => g.length);
+        const maxRow = groupVals.length > 0 ? Math.max(...groupVals) : 0;
+        return {
+          pos,
+          svgW: padX * 2 + (maxCol + 1) * (configNW + gX),
+          svgH: padY * 2 + maxRow * (configNH + gY),
+        };
+      }
+
+      function createSVGElement(parent, tag, attrs) {
+        const e = document.createElementNS(ns, tag);
+        Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+        parent.appendChild(e);
+        return e;
+      }
+
+      function createText(parent, val, cx, cy, fill, fw, fs) {
+        const t = document.createElementNS(ns, "text");
+        t.setAttribute("x", cx);
+        t.setAttribute("y", cy);
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("dominant-baseline", "central");
+        t.setAttribute("font-size", fs);
+        t.setAttribute("font-weight", fw);
+        t.setAttribute("fill", fill);
+        t.textContent = val;
+        parent.appendChild(t);
+      }
+
+      function drawPaths(svg, posMap, NW, NH, isBW) {
+        let pathsLayer = svg.querySelector(".path-layer");
+        if (!pathsLayer)
+          pathsLayer = createSVGElement(svg, "g", { class: "path-layer" });
+        pathsLayer.innerHTML = "";
+
+        raw.forEach((r) => {
+          r.pre.forEach((pid) => {
+            const from = posMap[pid],
+              to = posMap[r.id];
+            if (!from || !to) return;
+            const crit = map[r.id].SL === 0 && map[pid].SL === 0;
+            const dStr = `M ${from.x + NW} ${from.x + NW > to.x ? from.y + NH / 2 : from.y + NH / 2} L ${to.x - 8} ${to.y + NH / 2}`;
+
+            const attrs = isBW
+              ? {
+                  d: dStr,
+                  stroke: "#444",
+                  "stroke-width": 1.5,
+                  fill: "none",
+                  "marker-end": "url(#arr-bw)",
+                  "data-from": pid,
+                  "data-to": r.id,
+                }
+              : {
+                  d: dStr,
+                  stroke: crit ? "#c0392b" : "#999",
+                  "stroke-width": crit ? 2.5 : 1.2,
+                  fill: "none",
+                  "marker-end": crit ? "url(#arr-crit)" : "url(#arr)",
+                  "data-from": pid,
+                  "data-to": r.id,
+                };
+            createSVGElement(pathsLayer, "path", attrs);
+          });
+        });
+      }
+
+      function updatePathsLive(svg, posMap, NW, NH) {
+        const paths = svg.querySelectorAll(".path-layer path");
+        paths.forEach((path) => {
+          const pid = path.getAttribute("data-from");
+          const rid = path.getAttribute("data-to");
+          const from = posMap[pid],
+            to = posMap[rid];
+          const dStr = `M ${from.x + NW} ${from.x + NW > to.x ? from.y + NH / 2 : from.y + NH / 2} L ${to.x - 8} ${to.y + NH / 2}`;
+          path.setAttribute("d", dStr);
+        });
+      }
+
+      function setupDrag(svg, posMap, NW, NH) {
+        let draggedEl = null,
+          draggedId = null;
+        let offset = { x: 0, y: 0 };
+
+        svg.addEventListener("mousedown", (e) => {
+          const group = e.target.closest(".node-group");
+          if (group) {
+            draggedEl = group;
+            draggedId = group.getAttribute("data-id");
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            offset.x = svgP.x - posMap[draggedId].x;
+            offset.y = svgP.y - posMap[draggedId].y;
+          }
+        });
+
+        svg.addEventListener("mousemove", (e) => {
+          if (draggedEl) {
+            e.preventDefault();
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            posMap[draggedId].x = svgP.x - offset.x;
+            posMap[draggedId].y = svgP.y - offset.y;
+            draggedEl.setAttribute(
+              "transform",
+              `translate(${posMap[draggedId].x}, ${posMap[draggedId].y})`,
+            );
+            updatePathsLive(svg, posMap, NW, NH);
+          }
+        });
+
+        const endDrag = () => {
+          draggedEl = null;
+          draggedId = null;
+        };
+        svg.addEventListener("mouseup", endDrag);
+        svg.addEventListener("mouseleave", endDrag);
+      }
+
+      function drawDiagram() {
+        const svg = document.getElementById("diagram");
+        svg.innerHTML = "";
+        const NW = 180,
+          NH = 115;
+        const layout = layoutNodes(NW, NH);
+        posColored = layout.pos;
+        svg.setAttribute("viewBox", `0 0 ${layout.svgW} ${layout.svgH}`);
+        svg.style.width = layout.svgW + "px";
+
+        svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#777"/></marker><marker id="arr-crit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c0392b"/></marker></defs>`;
+        drawPaths(svg, posColored, NW, NH, false);
+
+        let nodeLayer = createSVGElement(svg, "g", { class: "node-layer" });
+
+        raw.forEach((r) => {
+          const m = map[r.id];
+          if (!m || !posColored[r.id]) return;
+          const crit = m.SL === 0;
+          const { x, y } = posColored[r.id];
+          const rH = NH / 3;
+
+          const g = createSVGElement(nodeLayer, "g", {
+            class: "node-group",
+            "data-id": r.id,
+            transform: `translate(${x}, ${y})`,
+          });
+
+          createSVGElement(g, "rect", {
+            x: 0,
+            y: 0,
+            width: NW,
+            height: NH,
+            rx: 2,
+            fill: crit ? "#fcebeb" : "#fff",
+            stroke: crit ? "#c0392b" : "#999",
+            "stroke-width": crit ? 2.5 : 0.8,
+          });
+          createSVGElement(g, "rect", {
+            x: 0,
+            y: 0,
+            width: NW,
+            height: rH,
+            rx: 2,
+            fill: crit ? "#f9d6d6" : "#e6f1fb",
+          });
+          createSVGElement(g, "rect", {
+            x: 0,
+            y: rH,
+            width: NW,
+            height: rH,
+            fill: "#f4f2ec",
+          });
+          createSVGElement(g, "rect", {
+            x: 0,
+            y: rH * 2,
+            width: NW,
+            height: rH,
+            rx: 2,
+            fill: crit ? "#f9d6d6" : "#eaf3de",
+          });
+
+          const lineAttr = { stroke: "#ccc", "stroke-width": 0.6 };
+          createSVGElement(g, "line", {
+            x1: 0,
+            y1: rH,
+            x2: NW,
+            y2: rH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: 0,
+            y1: rH * 2,
+            x2: NW,
+            y2: rH * 2,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: NW / 3,
+            y1: 0,
+            x2: NW / 3,
+            y2: rH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: (NW * 2) / 3,
+            y1: 0,
+            x2: (NW * 2) / 3,
+            y2: rH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: NW / 4,
+            y1: rH,
+            x2: NW / 4,
+            y2: rH * 2,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: NW / 3,
+            y1: rH * 2,
+            x2: NW / 3,
+            y2: NH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: (NW * 2) / 3,
+            y1: rH * 2,
+            x2: (NW * 2) / 3,
+            y2: NH,
+            ...lineAttr,
+          });
+
+          createText(g, m.ES, NW / 6, rH / 2, "#0c447c", 600, 11);
+          createText(g, r.id, NW / 2, rH / 2, "#0c447c", 800, 11);
+          createText(g, m.EF, (NW * 5) / 6, rH / 2, "#0c447c", 600, 11);
+          createText(
+            g,
+            "S:" + m.SL,
+            NW / 8,
+            rH * 1.5,
+            crit ? "#c0392b" : "#555",
+            700,
+            9,
+          );
+
+          const words = r.name.split(" "),
+            maxL = 22;
+          let lines = [],
+            cur = words[0];
+          for (let i = 1; i < words.length; i++) {
+            if ((cur + " " + words[i]).length <= maxL) cur += " " + words[i];
+            else {
+              lines.push(cur);
+              cur = words[i];
+            }
+          }
+          lines.push(cur);
+          lines.forEach((l, i) => {
+            const t = document.createElementNS(ns, "text");
+            t.setAttribute("x", NW * 0.62);
+            t.setAttribute("y", rH * 1.5 - (lines.length - 1) * 5.5 + i * 11.5);
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("font-size", 9.5);
+            t.setAttribute("fill", "#222");
+            t.textContent = l;
+            g.appendChild(t);
+          });
+
+          createText(g, m.LS, NW / 6, rH * 2.5, "#27500a", 600, 11);
+          createText(g, "d: " + r.d, NW / 2, rH * 2.5, "#333", 500, 11);
+          createText(g, m.LF, (NW * 5) / 6, rH * 2.5, "#27500a", 600, 11);
+        });
+
+        setupDrag(svg, posColored, NW, NH);
+      }
+
+      function drawDiagramBW() {
+        const svg = document.getElementById("diagram-bw");
+        svg.innerHTML = "";
+        const NW = 160,
+          NH = 90;
+        const layout = layoutNodes(NW, NH);
+        posBW = layout.pos;
+        svg.setAttribute("viewBox", `0 0 ${layout.svgW} ${layout.svgH}`);
+        svg.style.width = layout.svgW + "px";
+
+        svg.innerHTML = `
+          <defs>
+            <filter id="shadow-bw" x="-10%" y="-10%" width="130%" height="130%">
+              <feDropShadow dx="3" dy="4" stdDeviation="3" flood-opacity="0.25" flood-color="#000"/>
+            </filter>
+            <marker id="arr-bw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#444"/></marker>
+          </defs>`;
+
+        drawPaths(svg, posBW, NW, NH, true);
+        let nodeLayer = createSVGElement(svg, "g", { class: "node-layer" });
+
+        raw.forEach((r) => {
+          const m = map[r.id];
+          if (!m || !posBW[r.id]) return;
+          const { x, y } = posBW[r.id];
+          const rH = NH / 3,
+            c1 = 40,
+            c2 = 80,
+            c3 = 40;
+
+          const g = createSVGElement(nodeLayer, "g", {
+            class: "node-group",
+            "data-id": r.id,
+            transform: `translate(${x}, ${y})`,
+          });
+
+          createSVGElement(g, "rect", {
+            x: 0,
+            y: 0,
+            width: NW,
+            height: NH,
+            fill: "#f1f1f1",
+            stroke: "#666",
+            "stroke-width": 1,
+            filter: "url(#shadow-bw)",
+          });
+
+          const lineAttr = { stroke: "#888", "stroke-width": 0.8 };
+          createSVGElement(g, "line", {
+            x1: 0,
+            y1: rH,
+            x2: NW,
+            y2: rH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: 0,
+            y1: rH * 2,
+            x2: NW,
+            y2: rH * 2,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: c1,
+            y1: 0,
+            x2: c1,
+            y2: rH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: c1 + c2,
+            y1: 0,
+            x2: c1 + c2,
+            y2: rH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: c1,
+            y1: rH,
+            x2: c1,
+            y2: rH * 2,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: c1,
+            y1: rH * 2,
+            x2: c1,
+            y2: NH,
+            ...lineAttr,
+          });
+          createSVGElement(g, "line", {
+            x1: c1 + c2,
+            y1: rH * 2,
+            x2: c1 + c2,
+            y2: NH,
+            ...lineAttr,
+          });
+
+          createText(g, m.ES, c1 / 2, rH / 2, "#000", 500, 11);
+          createText(g, r.id, c1 + c2 / 2, rH / 2, "#000", 700, 11);
+          createText(g, m.EF, c1 + c2 + c3 / 2, rH / 2, "#000", 500, 11);
+          createText(g, m.SL, c1 / 2, rH * 1.5, "#000", 500, 11);
+
+          const words = r.name.split(" "),
+            maxL = 20;
+          let lines = [],
+            cur = words[0];
+          for (let i = 1; i < words.length; i++) {
+            if ((cur + " " + words[i]).length <= maxL) cur += " " + words[i];
+            else {
+              lines.push(cur);
+              cur = words[i];
+            }
+          }
+          lines.push(cur);
+          lines.forEach((l, i) => {
+            const t = document.createElementNS(ns, "text");
+            t.setAttribute("x", c1 + (c2 + c3) / 2);
+            t.setAttribute("y", rH * 1.5 - (lines.length - 1) * 5 + i * 10);
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("dominant-baseline", "central");
+            t.setAttribute("font-size", 9);
+            t.setAttribute("fill", "#000");
+            t.textContent = l;
+            g.appendChild(t);
+          });
+
+          createText(g, m.LS, c1 / 2, rH * 2.5, "#000", 500, 11);
+          createText(g, r.d, c1 + c2 / 2, rH * 2.5, "#000", 500, 11);
+          createText(g, m.LF, c1 + c2 + c3 / 2, rH * 2.5, "#000", 500, 11);
+        });
+
+        setupDrag(svg, posBW, NW, NH);
+      }
+
+      function buildCritPath() {
+        const critIds = order.filter((id) => map[id] && map[id].SL === 0);
+        document.getElementById("critbox").innerHTML = `
+          <h3 style="color:#c0392b; margin-bottom:15px; font-size:16px;">Hasil Analisis Jalur Kritis</h3>
+          <p style="margin-bottom:10px;">Berdasarkan perhitungan CPM, proyek ini memiliki durasi total <strong>${projEnd} Hari</strong>.</p>
+          <p style="margin-bottom:20px; font-size:13px; color:#666;">Urutan aktivitas tanpa kelonggaran waktu (Slack = 0):</p>
+          <div style="line-height:2.2">${critIds.map((id) => `<span class="node-tag">${id}</span>`).join(" &rarr; ")}</div>
+        `;
+      }
+
+      function showTab(t) {
+        ["tabel", "diagram", "bw", "kritis"].forEach(
+          (x) =>
+            (document.getElementById("tab-" + x).style.display =
+              x === t ? "block" : "none"),
+        );
+        document
+          .querySelectorAll(".tab")
+          .forEach((b, i) =>
+            b.classList.toggle(
+              "on",
+              ["tabel", "diagram", "bw", "kritis"][i] === t,
+            ),
+          );
+      }
+
+      function unduhGambar(targetId, fileName) {
+        const element = document.getElementById(targetId);
+        const wrappers = element.querySelectorAll(".table-wrap, .svg-wrap");
+
+        const originalStyles = [];
+        wrappers.forEach((wrap) => {
+          originalStyles.push({
+            el: wrap,
+            overflow: wrap.style.overflow,
+            width: wrap.style.width,
+          });
+          wrap.style.overflow = "visible";
+          wrap.style.width = wrap.scrollWidth + "px";
+        });
+
+        const origElemWidth = element.style.width;
+        element.style.width = element.scrollWidth + "px";
+
+        html2canvas(element, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          width: element.scrollWidth,
+          height: element.scrollHeight,
+        }).then((canvas) => {
+          element.style.width = origElemWidth;
+          originalStyles.forEach((item) => {
+            item.el.style.overflow = item.overflow;
+            item.el.style.width = item.width;
+          });
+
+          const link = document.createElement("a");
+          link.download = fileName;
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+      }
+
+      function unduhTemplateCSV() {
+        let csvContent = "ID;Deskripsi Aktivitas;Durasi;Aktivitas pendahulu\n";
+        raw.forEach((r) => {
+          const preStr = r.pre.length > 0 ? r.pre.join(", ") : "-";
+          csvContent += `${r.id};${r.name};${r.d};${preStr}\n`;
+        });
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "Template_WBS_Proyek.csv");
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      document
+        .getElementById("csvFileInput")
+        .addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split("\n").filter((line) => line.trim() !== "");
+            const newRaw = [];
+
+            for (let i = 1; i < lines.length; i++) {
+              let cols = lines[i].split(";");
+              if (cols.length < 4) {
+                cols =
+                  lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) ||
+                  lines[i].split(",");
+              }
+              if (cols.length < 4) continue;
+
+              const id = cols[0].replace(/"/g, "").trim();
+              const name = cols[1].replace(/"/g, "").trim();
+              const d = parseInt(cols[2].replace(/"/g, "").trim(), 10) || 0;
+              let preStr = cols[3].replace(/"/g, "").trim();
+              let pre = [];
+
+              if (preStr !== "-" && preStr !== "") {
+                pre = preStr
+                  .split(",")
+                  .map((p) => p.trim())
+                  .filter((p) => p !== "");
+              }
+              newRaw.push({ id, name, d, pre });
+            }
+
+            raw.length = 0;
+            raw.push(...newRaw);
+
+            initData();
+            buildTable();
+            drawDiagram();
+            drawDiagramBW();
+            buildCritPath();
+
+            document.getElementById("infobox").innerHTML =
+              `Data CSV berhasil diimpor! Estimasi penyelesaian proyek berubah menjadi <strong>${projEnd} hari</strong>. Diagram dan perhitungan tabel telah diperbarui.`;
+          };
+          reader.readAsText(file);
+        });
+
+      initData();
+      document.getElementById("infobox").innerHTML =
+        `Laporan Proyek: Estimasi penyelesaian dalam <strong>${projEnd} hari</strong>. Jalur kritis telah diidentifikasi dan dihitung secara presisi.`;
+      buildTable();
+      drawDiagram();
+      drawDiagramBW();
+      buildCritPath();
+    </script>
+  </body>
+</html>
