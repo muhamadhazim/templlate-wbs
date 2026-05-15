@@ -81,6 +81,34 @@
       .btn-secondary:hover {
         background: #1a252f;
       }
+      .mode-btn {
+        padding: 6px 10px;
+        border: 1px solid #bbb;
+        border-radius: 4px;
+        background: #fff;
+        color: #333;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .mode-btn.active {
+        background: #2c3e50;
+        color: #fff;
+        border-color: #2c3e50;
+      }
+      .edge-point-btn {
+        padding: 5px 9px;
+        border: 1px solid #bbb;
+        border-radius: 4px;
+        background: #fff;
+        color: #333;
+        font-size: 11px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .edge-point-btn:hover {
+        background: #f3f6fa;
+      }
 
       .import-section {
         margin-bottom: 20px;
@@ -144,7 +172,11 @@
         cursor: grabbing;
       }
       .path-layer path {
-        pointer-events: none;
+        pointer-events: stroke;
+        cursor: pointer;
+      }
+      .edge-handle {
+        cursor: move;
       }
 
       .legend-container {
@@ -262,7 +294,14 @@
 
       <div id="tab-diagram" style="display: none">
         <div class="legend-container">
-          <div style="display: flex; gap: 15px; flex-wrap: wrap">
+          <div
+            style="
+              display: flex;
+              gap: 15px;
+              flex-wrap: wrap;
+              align-items: center;
+            "
+          >
             <div class="legend-item">
               <span
                 class="swatch"
@@ -297,6 +336,21 @@
                 diagram</strong
               >
             </div>
+            <div class="legend-item" style="gap: 6px">
+              <strong>Titik Siku:</strong>
+              <button class="edge-point-btn" onclick="addEdgePoint()">
+                + Titik
+              </button>
+              <button class="edge-point-btn" onclick="removeEdgePoint()">
+                - Titik
+              </button>
+              <button class="edge-point-btn" onclick="undoEdgeEdit()">
+                Undo
+              </button>
+              <button class="edge-point-btn" onclick="redoEdgeEdit()">
+                Redo
+              </button>
+            </div>
           </div>
           <button
             class="btn-download"
@@ -318,7 +372,14 @@
 
       <div id="tab-bw" style="display: none">
         <div class="legend-container">
-          <div style="display: flex; gap: 15px; flex-wrap: wrap">
+          <div
+            style="
+              display: flex;
+              gap: 15px;
+              flex-wrap: wrap;
+              align-items: center;
+            "
+          >
             <div class="legend-item">
               <strong>Template Standar Manajemen Waktu Proyek</strong>
             </div>
@@ -327,6 +388,21 @@
                 >💡 Tips: Klik dan tahan kotak untuk menggeser letak
                 diagram</strong
               >
+            </div>
+            <div class="legend-item" style="gap: 6px">
+              <strong>Titik Siku:</strong>
+              <button class="edge-point-btn" onclick="addEdgePoint()">
+                + Titik
+              </button>
+              <button class="edge-point-btn" onclick="removeEdgePoint()">
+                - Titik
+              </button>
+              <button class="edge-point-btn" onclick="undoEdgeEdit()">
+                Undo
+              </button>
+              <button class="edge-point-btn" onclick="redoEdgeEdit()">
+                Redo
+              </button>
             </div>
           </div>
           <button
@@ -366,6 +442,18 @@
       let map, order, projEnd;
       let posColored = {},
         posBW = {};
+      let selectedEdgeKey = null;
+      const edgeControlPoints = {};
+      const edgeUndoStack = [];
+      const edgeRedoStack = [];
+      const coloredSize = { NW: 220, NH: 140 };
+      const bwSize = { NW: 190, NH: 115 };
+      const A4_LAYOUT = { w: 2200, h: 1556, margin: 70 };
+      const A4_EXPORT = { w: 3508, h: 2480, margin: 120 };
+      let layoutMode = "normal";
+      let autoEdgeRoutesColored = {};
+      let autoEdgeRoutesBW = {};
+      let isDraggingEdgeHandle = false;
 
       function topoSort(rows) {
         const inDeg = {},
@@ -513,6 +601,309 @@
         parent.appendChild(t);
       }
 
+      function getEdgeKey(fromId, toId) {
+        return `${fromId}->${toId}`;
+      }
+
+      function getEdgePoints(from, to, NW, NH) {
+        return {
+          startX: from.x + NW,
+          startY: from.y + NH / 2,
+          endX: to.x - 8,
+          endY: to.y + NH / 2,
+        };
+      }
+
+      function getDefaultControlPoint(
+        startX,
+        startY,
+        endX,
+        endY,
+        index,
+        total,
+      ) {
+        const ratio = (index + 1) / (total + 1);
+        return {
+          x: startX + (endX - startX) * ratio,
+          y: startY + (endY - startY) * ratio,
+        };
+      }
+
+      function cloneEdgePoints() {
+        return JSON.parse(JSON.stringify(edgeControlPoints));
+      }
+
+      function applyEdgePointsState(snapshot) {
+        Object.keys(edgeControlPoints).forEach(
+          (k) => delete edgeControlPoints[k],
+        );
+        Object.entries(snapshot).forEach(([k, v]) => {
+          edgeControlPoints[k] = v;
+        });
+      }
+
+      function recordEdgeHistory() {
+        edgeUndoStack.push(cloneEdgePoints());
+        edgeRedoStack.length = 0;
+      }
+
+      function undoEdgeEdit() {
+        if (edgeUndoStack.length === 0) return;
+        edgeRedoStack.push(cloneEdgePoints());
+        const prev = edgeUndoStack.pop();
+        applyEdgePointsState(prev);
+        refreshAllPathsAndHandles();
+      }
+
+      function redoEdgeEdit() {
+        if (edgeRedoStack.length === 0) return;
+        edgeUndoStack.push(cloneEdgePoints());
+        const next = edgeRedoStack.pop();
+        applyEdgePointsState(next);
+        refreshAllPathsAndHandles();
+      }
+
+      function normalizeEdgePoints(edgeKey) {
+        const manual = edgeControlPoints[edgeKey];
+        if (!manual) {
+          edgeControlPoints[edgeKey] = [];
+          return edgeControlPoints[edgeKey];
+        }
+        if (Array.isArray(manual)) return manual;
+        if (typeof manual === "object" && manual !== null && "dx" in manual) {
+          edgeControlPoints[edgeKey] = [manual];
+          return edgeControlPoints[edgeKey];
+        }
+        edgeControlPoints[edgeKey] = [];
+        return edgeControlPoints[edgeKey];
+      }
+
+      function getControlPoints(edgeKey, startX, startY, endX, endY) {
+        const points = normalizeEdgePoints(edgeKey);
+        return points.map((p, i) => {
+          const base = getDefaultControlPoint(
+            startX,
+            startY,
+            endX,
+            endY,
+            i,
+            points.length,
+          );
+          return { x: base.x + p.dx, y: base.y + p.dy, index: i };
+        });
+      }
+
+      function ensureSelectedEdgePoint() {
+        if (!selectedEdgeKey) return;
+        const points = normalizeEdgePoints(selectedEdgeKey);
+        if (points.length === 0) points.push({ dx: 0, dy: 0 });
+      }
+
+      function addEdgePoint() {
+        if (!selectedEdgeKey) return;
+        recordEdgeHistory();
+        const points = normalizeEdgePoints(selectedEdgeKey);
+        points.push({ dx: 0, dy: 0 });
+        refreshAllPathsAndHandles();
+      }
+
+      function removeEdgePoint() {
+        if (!selectedEdgeKey) return;
+        const points = normalizeEdgePoints(selectedEdgeKey);
+        if (points.length === 0) return;
+        recordEdgeHistory();
+        if (points.length === 1) {
+          edgeControlPoints[selectedEdgeKey] = [];
+        } else {
+          points.pop();
+        }
+        refreshAllPathsAndHandles();
+      }
+
+      function buildArrowPath(from, to, NW, NH, edgeKey) {
+        const { startX, startY, endX, endY } = getEdgePoints(from, to, NW, NH);
+        const points = normalizeEdgePoints(edgeKey);
+
+        if (points.length === 0) {
+          return `M ${startX} ${startY} L ${endX} ${endY}`;
+        }
+
+        const controls = getControlPoints(edgeKey, startX, startY, endX, endY);
+        let d = `M ${startX} ${startY}`;
+        let currentY = startY;
+        controls.forEach((control) => {
+          d += ` L ${control.x} ${currentY}`;
+          d += ` L ${control.x} ${control.y}`;
+          currentY = control.y;
+        });
+        d += ` L ${endX - 14} ${currentY}`;
+        d += ` L ${endX - 14} ${endY}`;
+        d += ` L ${endX} ${endY}`;
+        return d;
+      }
+
+      function renderEdgeHandle(svg, posMap, NW, NH, isBW) {
+        let handleLayer = svg.querySelector(".handle-layer");
+        if (!handleLayer)
+          handleLayer = createSVGElement(svg, "g", { class: "handle-layer" });
+        handleLayer.innerHTML = "";
+
+        if (!selectedEdgeKey) return;
+        const [fromId, toId] = selectedEdgeKey.split("->");
+        const from = posMap[fromId];
+        const to = posMap[toId];
+        if (!from || !to) return;
+
+        const { startX, startY, endX, endY } = getEdgePoints(from, to, NW, NH);
+        const controls = getControlPoints(
+          selectedEdgeKey,
+          startX,
+          startY,
+          endX,
+          endY,
+        );
+
+        controls.forEach((control) => {
+          createSVGElement(handleLayer, "circle", {
+            class: "edge-handle",
+            cx: control.x,
+            cy: control.y,
+            r: 6,
+            fill: isBW ? "#fff" : "#e6f1fb",
+            stroke: isBW ? "#222" : "#185fa5",
+            "stroke-width": 1.5,
+            "data-edge-key": selectedEdgeKey,
+            "data-point-index": control.index,
+          });
+        });
+      }
+
+      function refreshAllPathsAndHandles() {
+        const svgColored = document.getElementById("diagram");
+        const svgBW = document.getElementById("diagram-bw");
+
+        if (svgColored && Object.keys(posColored).length) {
+          updatePathsLive(
+            svgColored,
+            posColored,
+            coloredSize.NW,
+            coloredSize.NH,
+          );
+          renderEdgeHandle(
+            svgColored,
+            posColored,
+            coloredSize.NW,
+            coloredSize.NH,
+            false,
+          );
+        }
+        if (svgBW && Object.keys(posBW).length) {
+          updatePathsLive(svgBW, posBW, bwSize.NW, bwSize.NH);
+          renderEdgeHandle(svgBW, posBW, bwSize.NW, bwSize.NH, true);
+        }
+      }
+
+      function setupEdgeInteraction(svg, posMap, NW, NH, isBW) {
+        if (svg._edgeHandlers) {
+          svg.removeEventListener("click", svg._edgeHandlers.click);
+          svg.removeEventListener("mousedown", svg._edgeHandlers.mousedown);
+          svg.removeEventListener("mousemove", svg._edgeHandlers.mousemove);
+          svg.removeEventListener("mouseup", svg._edgeHandlers.mouseup);
+          svg.removeEventListener("mouseleave", svg._edgeHandlers.mouseleave);
+        }
+
+        let draggingHandle = false;
+        let handleEdgeKey = null;
+        let handlePointIndex = -1;
+
+        const onClick = (e) => {
+          const path = e.target.closest(".path-layer path");
+          if (path) {
+            selectedEdgeKey = path.getAttribute("data-edge-key");
+            ensureSelectedEdgePoint();
+            refreshAllPathsAndHandles();
+            return;
+          }
+          if (e.target === svg) {
+            selectedEdgeKey = null;
+            refreshAllPathsAndHandles();
+          }
+        };
+
+        const onMouseDown = (e) => {
+          const handle = e.target.closest(".edge-handle");
+          if (!handle) return;
+          e.preventDefault();
+          e.stopPropagation();
+          draggingHandle = true;
+          isDraggingEdgeHandle = true;
+          recordEdgeHistory();
+          handleEdgeKey = handle.getAttribute("data-edge-key");
+          handlePointIndex = parseInt(
+            handle.getAttribute("data-point-index") || "-1",
+            10,
+          );
+        };
+
+        const onMouseMove = (e) => {
+          if (!draggingHandle || !handleEdgeKey || handlePointIndex < 0) return;
+          const [fromId, toId] = handleEdgeKey.split("->");
+          const from = posMap[fromId];
+          const to = posMap[toId];
+          if (!from || !to) return;
+
+          const pt = svg.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+          const points = normalizeEdgePoints(handleEdgeKey);
+          if (!points[handlePointIndex]) return;
+
+          const { startX, startY, endX, endY } = getEdgePoints(
+            from,
+            to,
+            NW,
+            NH,
+          );
+          const base = getDefaultControlPoint(
+            startX,
+            startY,
+            endX,
+            endY,
+            handlePointIndex,
+            points.length,
+          );
+          points[handlePointIndex] = {
+            dx: svgP.x - base.x,
+            dy: svgP.y - base.y,
+          };
+          selectedEdgeKey = handleEdgeKey;
+          refreshAllPathsAndHandles();
+        };
+
+        const endHandleDrag = () => {
+          draggingHandle = false;
+          isDraggingEdgeHandle = false;
+          handleEdgeKey = null;
+          handlePointIndex = -1;
+        };
+
+        svg.addEventListener("click", onClick);
+        svg.addEventListener("mousedown", onMouseDown);
+        svg.addEventListener("mousemove", onMouseMove);
+        svg.addEventListener("mouseup", endHandleDrag);
+        svg.addEventListener("mouseleave", endHandleDrag);
+
+        svg._edgeHandlers = {
+          click: onClick,
+          mousedown: onMouseDown,
+          mousemove: onMouseMove,
+          mouseup: endHandleDrag,
+          mouseleave: endHandleDrag,
+        };
+      }
+
       function drawPaths(svg, posMap, NW, NH, isBW) {
         let pathsLayer = svg.querySelector(".path-layer");
         if (!pathsLayer)
@@ -524,8 +915,9 @@
             const from = posMap[pid],
               to = posMap[r.id];
             if (!from || !to) return;
+            const edgeKey = getEdgeKey(pid, r.id);
             const crit = map[r.id].SL === 0 && map[pid].SL === 0;
-            const dStr = `M ${from.x + NW} ${from.x + NW > to.x ? from.y + NH / 2 : from.y + NH / 2} L ${to.x - 8} ${to.y + NH / 2}`;
+            const dStr = buildArrowPath(from, to, NW, NH, edgeKey);
 
             const attrs = isBW
               ? {
@@ -536,6 +928,7 @@
                   "marker-end": "url(#arr-bw)",
                   "data-from": pid,
                   "data-to": r.id,
+                  "data-edge-key": edgeKey,
                 }
               : {
                   d: dStr,
@@ -545,6 +938,7 @@
                   "marker-end": crit ? "url(#arr-crit)" : "url(#arr)",
                   "data-from": pid,
                   "data-to": r.id,
+                  "data-edge-key": edgeKey,
                 };
             createSVGElement(pathsLayer, "path", attrs);
           });
@@ -556,19 +950,33 @@
         paths.forEach((path) => {
           const pid = path.getAttribute("data-from");
           const rid = path.getAttribute("data-to");
+          const edgeKey =
+            path.getAttribute("data-edge-key") || getEdgeKey(pid, rid);
           const from = posMap[pid],
             to = posMap[rid];
-          const dStr = `M ${from.x + NW} ${from.x + NW > to.x ? from.y + NH / 2 : from.y + NH / 2} L ${to.x - 8} ${to.y + NH / 2}`;
+          if (!from || !to) return;
+          const dStr = buildArrowPath(from, to, NW, NH, edgeKey);
           path.setAttribute("d", dStr);
         });
       }
 
       function setupDrag(svg, posMap, NW, NH) {
+        if (svg._nodeDragHandlers) {
+          svg.removeEventListener("mousedown", svg._nodeDragHandlers.mousedown);
+          svg.removeEventListener("mousemove", svg._nodeDragHandlers.mousemove);
+          svg.removeEventListener("mouseup", svg._nodeDragHandlers.mouseup);
+          svg.removeEventListener(
+            "mouseleave",
+            svg._nodeDragHandlers.mouseleave,
+          );
+        }
+
         let draggedEl = null,
           draggedId = null;
         let offset = { x: 0, y: 0 };
 
-        svg.addEventListener("mousedown", (e) => {
+        const onMouseDown = (e) => {
+          if (isDraggingEdgeHandle) return;
           const group = e.target.closest(".node-group");
           if (group) {
             draggedEl = group;
@@ -580,9 +988,9 @@
             offset.x = svgP.x - posMap[draggedId].x;
             offset.y = svgP.y - posMap[draggedId].y;
           }
-        });
+        };
 
-        svg.addEventListener("mousemove", (e) => {
+        const onMouseMove = (e) => {
           if (draggedEl) {
             e.preventDefault();
             const pt = svg.createSVGPoint();
@@ -595,23 +1003,32 @@
               "transform",
               `translate(${posMap[draggedId].x}, ${posMap[draggedId].y})`,
             );
-            updatePathsLive(svg, posMap, NW, NH);
+            refreshAllPathsAndHandles();
           }
-        });
+        };
 
         const endDrag = () => {
           draggedEl = null;
           draggedId = null;
         };
+
+        svg.addEventListener("mousedown", onMouseDown);
+        svg.addEventListener("mousemove", onMouseMove);
         svg.addEventListener("mouseup", endDrag);
         svg.addEventListener("mouseleave", endDrag);
+
+        svg._nodeDragHandlers = {
+          mousedown: onMouseDown,
+          mousemove: onMouseMove,
+          mouseup: endDrag,
+          mouseleave: endDrag,
+        };
       }
 
       function drawDiagram() {
         const svg = document.getElementById("diagram");
         svg.innerHTML = "";
-        const NW = 180,
-          NH = 115;
+        const { NW, NH } = coloredSize;
         const layout = layoutNodes(NW, NH);
         posColored = layout.pos;
         svg.setAttribute("viewBox", `0 0 ${layout.svgW} ${layout.svgH}`);
@@ -619,6 +1036,7 @@
 
         svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#777"/></marker><marker id="arr-crit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c0392b"/></marker></defs>`;
         drawPaths(svg, posColored, NW, NH, false);
+        renderEdgeHandle(svg, posColored, NW, NH, false);
 
         let nodeLayer = createSVGElement(svg, "g", { class: "node-layer" });
 
@@ -762,13 +1180,13 @@
         });
 
         setupDrag(svg, posColored, NW, NH);
+        setupEdgeInteraction(svg, posColored, NW, NH, false);
       }
 
       function drawDiagramBW() {
         const svg = document.getElementById("diagram-bw");
         svg.innerHTML = "";
-        const NW = 160,
-          NH = 90;
+        const { NW, NH } = bwSize;
         const layout = layoutNodes(NW, NH);
         posBW = layout.pos;
         svg.setAttribute("viewBox", `0 0 ${layout.svgW} ${layout.svgH}`);
@@ -783,6 +1201,7 @@
           </defs>`;
 
         drawPaths(svg, posBW, NW, NH, true);
+        renderEdgeHandle(svg, posBW, NW, NH, true);
         let nodeLayer = createSVGElement(svg, "g", { class: "node-layer" });
 
         raw.forEach((r) => {
@@ -897,6 +1316,7 @@
         });
 
         setupDrag(svg, posBW, NW, NH);
+        setupEdgeInteraction(svg, posBW, NW, NH, true);
       }
 
       function buildCritPath() {
